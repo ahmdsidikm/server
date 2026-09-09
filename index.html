@@ -210,7 +210,7 @@ main{
 
 <main>
   <label class="dropzone" id="dropzone">
-    <input type="file" id="fileInput">
+    <input type="file" id="fileInput" multiple>
     <p><strong>Klik untuk pilih file</strong> atau seret ke sini</p>
     <div class="status" id="status"></div>
     <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
@@ -239,7 +239,7 @@ const lightbox = document.getElementById("lightbox");
 const lightboxImg = document.getElementById("lightboxImg");
 
 fileInput.addEventListener("change", () => {
-  if (fileInput.files[0]) uploadFoto(fileInput.files[0]);
+  if (fileInput.files.length) uploadBanyakFoto(fileInput.files);
 });
 
 ["dragenter","dragover"].forEach(evt =>
@@ -249,16 +249,24 @@ fileInput.addEventListener("change", () => {
   dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove("drag"); })
 );
 dropzone.addEventListener("drop", e => {
-  const file = e.dataTransfer.files[0];
-  if (file) uploadFoto(file);
+  if (e.dataTransfer.files.length) uploadBanyakFoto(e.dataTransfer.files);
 });
 
 const progress = document.getElementById("progress");
 const progressBar = document.getElementById("progressBar");
 
+async function uploadBanyakFoto(fileList) {
+  const files = Array.from(fileList);
+  for (let i = 0; i < files.length; i++) {
+    status.className = "status";
+    status.innerText = `Mengupload ${i + 1} dari ${files.length}: ${files[i].name}`;
+    await uploadFoto(files[i]);
+  }
+  status.className = "status ok";
+  status.innerText = `${files.length} file berhasil diupload`;
+}
+
 async function uploadFoto(file) {
-  status.className = "status";
-  status.innerText = "Mengupload...";
   progress.classList.add("show");
   progressBar.style.width = "0%";
 

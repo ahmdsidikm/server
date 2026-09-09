@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arsip Foto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#0e0e10;
+  --panel:#17171a;
+  --line:#28282c;
+  --text:#ededf0;
+  --muted:#8a8a91;
+  --accent:#e8a33d;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+}
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:28px 40px;
+  border-bottom:1px solid var(--line);
+}
+header h1{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:22px;
+  font-weight:600;
+  letter-spacing:-0.02em;
+}
+header span{
+  color:var(--muted);
+  font-size:13px;
+}
+main{
+  max-width:1040px;
+  margin:0 auto;
+  padding:40px;
+}
+.dropzone{
+  display:block;
+  border:1px dashed var(--line);
+  border-radius:14px;
+  padding:48px 24px;
+  text-align:center;
+  cursor:pointer;
+  transition:border-color .15s ease, background .15s ease;
+}
+.dropzone:hover, .dropzone.drag{
+  border-color:var(--accent);
+  background:rgba(232,163,61,0.04);
+}
+.dropzone p{
+  font-size:15px;
+  color:var(--muted);
+}
+.dropzone strong{
+  color:var(--text);
+  font-weight:500;
+}
+.dropzone input{display:none;}
+.status{
+  margin-top:16px;
+  font-size:13px;
+  color:var(--muted);
+  min-height:18px;
+}
+.status.error{color:#e5484d;}
+.status.ok{color:var(--accent);}
+.progress{
+  margin-top:12px;
+  height:4px;
+  border-radius:4px;
+  background:var(--line);
+  overflow:hidden;
+  display:none;
+}
+.progress.show{display:block;}
+.progress-bar{
+  height:100%;
+  width:0%;
+  background:var(--accent);
+  transition:width .1s linear;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:14px;
+  margin-top:36px;
+}
+.card{
+  position:relative;
+  aspect-ratio:1;
+  border-radius:10px;
+  overflow:hidden;
+  background:var(--panel);
+  border:1px solid var(--line);
+  cursor:zoom-in;
+}
+.card img{
+  position:relative;
+  z-index:1;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  transition:transform .25s ease;
+}
+.card:hover img{transform:scale(1.05);}
+.filecard{
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:12px;
+  text-align:center;
+}
+.filecard .ext{
+  font-family:'Space Grotesk',sans-serif;
+  font-size:13px;
+  font-weight:700;
+  color:var(--accent);
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:4px 10px;
+}
+.filecard .name{
+  font-size:11px;
+  color:var(--muted);
+  word-break:break-all;
+  line-height:1.4;
+}
+.card-actions{
+  position:absolute;
+  top:0;left:0;right:0;
+  z-index:2;
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+  padding:8px;
+  background:linear-gradient(180deg, rgba(0,0,0,0.55), transparent);
+}
+.card-actions button{
+  width:28px;height:28px;
+  border:none;
+  border-radius:6px;
+  background:rgba(23,23,26,0.85);
+  color:var(--text);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+}
+.card-actions button:hover{background:var(--accent);color:#0e0e10;}
+.card-actions .del:hover{background:#e5484d;color:#fff;}
+.empty{
+  grid-column:1/-1;
+  text-align:center;
+  color:var(--muted);
+  font-size:13px;
+  padding:40px 0;
+}
+.lightbox{
+  position:fixed;
+  inset:0;
+  background:rgba(10,10,11,0.94);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  padding:40px;
+}
+.lightbox.open{display:flex;}
+.lightbox img{
+  max-width:100%;
+  max-height:100%;
+  border-radius:6px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.lightbox .close{
+  position:absolute;
+  top:24px;
+  right:32px;
+  color:var(--muted);
+  font-size:28px;
+  cursor:pointer;
+  line-height:1;
+}
+.lightbox .close:hover{color:var(--text);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Arsip Foto</h1>
+  <span id="count">0 foto</span>
+</header>
+
+<main>
+  <label class="dropzone" id="dropzone">
+    <input type="file" id="fileInput">
+    <p><strong>Klik untuk pilih file</strong> atau seret ke sini</p>
+    <div class="status" id="status"></div>
+    <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+  </label>
+
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="lightbox" id="lightbox">
+  <span class="close" id="closeBtn">&times;</span>
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+const SUPABASE_URL = "http://192.168.19.110:8000";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const BUCKET = "PBP";
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const status = document.getElementById("status");
+const grid = document.getElementById("grid");
+const count = document.getElementById("count");
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightboxImg");
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files[0]) uploadFoto(fileInput.files[0]);
+});
+
+["dragenter","dragover"].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add("drag"); })
+);
+["dragleave","drop"].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove("drag"); })
+);
+dropzone.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFoto(file);
+});
+
+const progress = document.getElementById("progress");
+const progressBar = document.getElementById("progressBar");
+
+async function uploadFoto(file) {
+  status.className = "status";
+  status.innerText = "Mengupload...";
+  progress.classList.add("show");
+  progressBar.style.width = "0%";
+
+  const fileName = `${Date.now()}_${file.name}`;
+
+  try {
+    await uploadDenganProgress(fileName, file);
+  } catch (err) {
+    status.className = "status error";
+    status.innerText = "Gagal: " + err.message;
+    progress.classList.remove("show");
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from(BUCKET).getPublicUrl(fileName);
+  await sb.from("foto").insert({ nama_file: fileName, url: urlData.publicUrl });
+
+  status.className = "status ok";
+  status.innerText = "Berhasil diupload";
+  progressBar.style.width = "100%";
+  setTimeout(() => progress.classList.remove("show"), 500);
+  loadGaleri();
+}
+
+function uploadDenganProgress(fileName, file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`);
+    xhr.setRequestHeader("apikey", SUPABASE_KEY);
+    xhr.setRequestHeader("Authorization", `Bearer ${SUPABASE_KEY}`);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) {
+        progressBar.style.width = (e.loaded / e.total * 100) + "%";
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(xhr.responseText || "Upload gagal"));
+    };
+    xhr.onerror = () => reject(new Error("Koneksi gagal"));
+    xhr.send(file);
+  });
+}
+
+async function loadGaleri() {
+  const { data, error } = await sb.from("foto").select("*").order("created_at", { ascending: false });
+  grid.innerHTML = "";
+  if (error || !data || data.length === 0) {
+    grid.innerHTML = '<div class="empty">Belum ada foto</div>';
+    count.innerText = "0 foto";
+    return;
+  }
+  count.innerText = `${data.length} foto`;
+  data.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const isImage = /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(item.nama_file);
+    const ext = item.nama_file.split(".").pop().toUpperCase();
+    const preview = isImage
+      ? `<img src="${item.url}" loading="lazy">`
+      : `<div class="filecard"><span class="ext">${ext}</span><span class="name">${item.nama_file}</span></div>`;
+    card.innerHTML = `
+      <div class="card-actions">
+        <button class="dl" title="Download">&#8681;</button>
+        <button class="del" title="Hapus">&times;</button>
+      </div>
+      ${preview}
+    `;
+    if (isImage) {
+      card.querySelector("img").addEventListener("click", () => openLightbox(item.url));
+    } else {
+      card.querySelector(".filecard").addEventListener("click", () => downloadFoto(item.url, item.nama_file));
+    }
+    card.querySelector(".dl").addEventListener("click", e => { e.stopPropagation(); downloadFoto(item.url, item.nama_file); });
+    card.querySelector(".del").addEventListener("click", e => { e.stopPropagation(); hapusFoto(item.id, item.nama_file); });
+    grid.appendChild(card);
+  });
+}
+
+async function downloadFoto(url, nama) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = nama;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function hapusFoto(id, nama) {
+  if (!confirm("Hapus foto ini?")) return;
+  await sb.storage.from(BUCKET).remove([nama]);
+  await sb.from("foto").delete().eq("id", id);
+  loadGaleri();
+}
+
+function openLightbox(url) {
+  lightboxImg.src = url;
+  lightbox.classList.add("open");
+}
+function closeLightbox() {
+  lightbox.classList.remove("open");
+  lightboxImg.src = "";
+}
+document.getElementById("closeBtn").addEventListener("click", closeLightbox);
+lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
+
+loadGaleri();
+</script>
+</body>
+</html>
